@@ -1,0 +1,228 @@
+{
+  "entities": {
+    "Item": {
+      "title": "Inventory Item",
+      "description": "Master data barang inventaris gudang dengan standardisasi 18 digit SAP dan lokasi bin card",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID unik dokumen atau nomor material 18 digit"
+        },
+        "material_no": {
+          "type": "string",
+          "pattern": "^[0-9]{18}$",
+          "description": "Nomor material tepat 18 angka digit (SAP standard)"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Nama barang / material"
+        },
+        "specification": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Spesifikasi teknis, part number, atau ukuran"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Kategori barang (e.g. Mekanikal, Elektrikal, Safety, Consumables)"
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Satuan unit barang (EA, PCS, SET, ROLL, MTR, KG, LTR, BOX, DRUM)"
+        },
+        "contract_type": {
+          "type": "string",
+          "enum": ["FPA", "NON_FPA"],
+          "description": "Jenis kontrak: FPA atau NON_FPA"
+        },
+        "location": {
+          "type": "string",
+          "pattern": "^[0-9A-Za-z\\.]+$",
+          "maxLength": 50,
+          "description": "Lokasi fisik berjenjang: Ruang.Rak.Baris.Tingkat (e.g. 1.03.02.04B)"
+        },
+        "current_stock": {
+          "type": "number",
+          "description": "Saldo kuantitas fisik stok saat ini di gudang"
+        },
+        "min_stock": {
+          "type": "number",
+          "description": "Batas kuantitas stok minimum / safety stock"
+        },
+        "max_stock": {
+          "type": "number",
+          "description": "Kapasitas kuantitas stok maksimum rak"
+        },
+        "procurement_status": {
+          "type": "string",
+          "enum": ["NORMAL", "MINIMUM", "PR_REQUIRED", "PR_PROCESSED", "ARRIVED", "PROCESSED"],
+          "description": "Status pengadaan barang"
+        },
+        "created_at": {
+          "type": "string",
+          "description": "Waktu pembuatan data (ISO timestamp)"
+        },
+        "updated_at": {
+          "type": "string",
+          "description": "Waktu pembaruan data terakhir (ISO timestamp)"
+        },
+        "updated_by": {
+          "type": "string",
+          "description": "Username operator yang memperbarui"
+        }
+      },
+      "required": ["material_no", "name", "category", "unit", "contract_type", "location", "current_stock", "min_stock"]
+    },
+    "Transaction": {
+      "title": "Stock Mutation Transaction",
+      "description": "Catatan mutasi stok barang masuk, keluar, atau hasil penyesuaian STO",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID unik transaksi mutasi"
+        },
+        "item_id": {
+          "type": "string",
+          "description": "ID barang yang bermutasi"
+        },
+        "material_no": {
+          "type": "string",
+          "pattern": "^[0-9]{18}$",
+          "description": "Nomor material 18 digit"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["IN", "OUT", "STO"],
+          "description": "Tipe mutasi: IN (Masuk), OUT (Keluar), atau STO (Penyesuaian Opname)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Kuantitas barang yang bermutasi"
+        },
+        "balance_before": {
+          "type": "number",
+          "description": "Saldo stok sebelum mutasi"
+        },
+        "balance_after": {
+          "type": "number",
+          "description": "Saldo stok setelah mutasi"
+        },
+        "doc_ref": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nomor dokumen referensi (Surat Jalan / PO / SPK / Work Order / BA-STO)"
+        },
+        "pic_name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nama person-in-charge (penerima/pengambil/petugas)"
+        },
+        "operator_username": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Username operator yang mencatat transaksi"
+        },
+        "operator_group": {
+          "type": "string",
+          "enum": ["Group A", "Group B", "Group C", "Group D", "None"],
+          "description": "Regu kerja staf"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Catatan keterangan transaksi"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Waktu mutasi (ISO timestamp)"
+        }
+      },
+      "required": ["item_id", "material_no", "type", "quantity", "balance_after", "doc_ref", "pic_name", "operator_username", "timestamp"]
+    },
+    "StockTake": {
+      "title": "Stock Take Audit",
+      "description": "Catatan audit fisik stock opname berkala",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID unik audit STO"
+        },
+        "item_id": {
+          "type": "string",
+          "description": "ID barang yang diaudit"
+        },
+        "material_no": {
+          "type": "string",
+          "description": "Nomor material 18 digit"
+        },
+        "system_stock": {
+          "type": "number",
+          "description": "Saldo stok tercatat di sistem saat opname"
+        },
+        "physical_stock": {
+          "type": "number",
+          "description": "Saldo stok hasil hitung fisik di lapangan"
+        },
+        "variance": {
+          "type": "number",
+          "description": "Selisih kuantitas (physical_stock - system_stock)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["MATCH", "SURPLUS", "DEFICIT"],
+          "description": "Status hasil opname"
+        },
+        "ba_number": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nomor Berita Acara STO"
+        },
+        "auditor_username": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Username petugas auditor"
+        },
+        "auditor_group": {
+          "type": "string",
+          "description": "Regu kerja auditor"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Keterangan temuan opname fisik"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Waktu pelaksanaan opname (ISO timestamp)"
+        }
+      },
+      "required": ["item_id", "material_no", "system_stock", "physical_stock", "variance", "status", "ba_number", "auditor_username", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/items/{itemId}": {
+      "schema": {
+        "$ref": "#/entities/Item"
+      },
+      "description": "Koleksi data master barang inventaris gudang"
+    },
+    "/transactions/{transactionId}": {
+      "schema": {
+        "$ref": "#/entities/Transaction"
+      },
+      "description": "Koleksi riwayat transaksi mutasi stok barang (IN, OUT, STO)"
+    },
+    "/stockTakes/{stockTakeId}": {
+      "schema": {
+        "$ref": "#/entities/StockTake"
+      },
+      "description": "Koleksi catatan pelaksanaan stock opname fisik (STO)"
+    }
+  }
+}

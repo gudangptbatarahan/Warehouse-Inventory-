@@ -1,0 +1,11 @@
+{
+  "name": "WMS Gudang Presisi - Kartu Barang Digital & Mutasi Stok",
+  "description": "Sistem Manajemen Inventaris Gudang dengan Kartu Barang Digital (Bin Card), QR/OCR Scanner, Mutasi Stok Real-Time, Standardisasi SAP 18-Digit, dan Sinkronisasi Multi-Device.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
+

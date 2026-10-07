@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && request.auth.token.email == "gudangptbatarahan@gmail.com";
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Item validation
+    function isValidItem(data) {
+      return data.keys().hasAll(['material_no', 'name', 'category', 'unit', 'contract_type', 'location', 'current_stock', 'min_stock']) &&
+             data.material_no is string && data.material_no.size() == 18 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.unit is string && data.unit.size() <= 20 &&
+             data.contract_type in ['FPA', 'NON_FPA'] &&
+             data.location is string && data.location.size() <= 50 &&
+             data.current_stock is number &&
+             data.min_stock is number;
+    }
+
+    // Transaction validation
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['item_id', 'material_no', 'type', 'quantity', 'balance_after', 'doc_ref', 'pic_name', 'operator_username', 'timestamp']) &&
+             data.item_id is string && data.item_id.size() <= 128 &&
+             data.material_no is string && data.material_no.size() == 18 &&
+             data.type in ['IN', 'OUT', 'STO'] &&
+             data.quantity is number && data.quantity >= 0 &&
+             data.balance_after is number &&
+             data.doc_ref is string && data.doc_ref.size() <= 100 &&
+             data.pic_name is string && data.pic_name.size() <= 100 &&
+             data.operator_username is string && data.operator_username.size() <= 50;
+    }
+
+    // Stock Take validation
+    function isValidStockTake(data) {
+      return data.keys().hasAll(['item_id', 'material_no', 'system_stock', 'physical_stock', 'variance', 'status', 'ba_number', 'auditor_username', 'timestamp']) &&
+             data.item_id is string && data.item_id.size() <= 128 &&
+             data.material_no is string && data.material_no.size() == 18 &&
+             data.system_stock is number &&
+             data.physical_stock is number &&
+             data.variance is number &&
+             data.status in ['MATCH', 'SURPLUS', 'DEFICIT'] &&
+             data.ba_number is string && data.ba_number.size() <= 100 &&
+             data.auditor_username is string && data.auditor_username.size() <= 50;
+    }
+
+    // Items Collection
+    match /items/{itemId} {
+      allow read: if true;
+      allow create: if isValidId(itemId) && isValidItem(incoming());
+      allow update: if isValidId(itemId) && isValidItem(incoming());
+      allow delete: if isValidId(itemId);
+    }
+
+    // Transactions Collection
+    match /transactions/{transactionId} {
+      allow read: if true;
+      allow create: if isValidId(transactionId) && isValidTransaction(incoming());
+      allow update: if isValidId(transactionId) && isValidTransaction(incoming());
+      allow delete: if isValidId(transactionId);
+    }
+
+    // StockTake Collection
+    match /stockTakes/{stockTakeId} {
+      allow read: if true;
+      allow create: if isValidId(stockTakeId) && isValidStockTake(incoming());
+      allow update: if isValidId(stockTakeId) && isValidStockTake(incoming());
+      allow delete: if isValidId(stockTakeId);
+    }
+  }
+}
