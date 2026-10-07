@@ -25,7 +25,8 @@ import {
   Trash2,
   FileText,
   Tag,
-  Package
+  Package,
+  PenSquare
 } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
@@ -46,9 +47,51 @@ export const Dashboard: React.FC = () => {
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | 'PR_REQUEST' | 'DIPROSES'>('ALL');
   const [isPrTableMinimized, setIsPrTableMinimized] = useState(false);
 
-  // Inline edit state for Evaluator notes
-  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
-  const [tempNotesText, setTempNotesText] = useState<string>('');
+  // Evaluator PR Notes Modal State
+  const [modalPrItem, setModalPrItem] = useState<InventoryItem | null>(null);
+  const [modalNotesText, setModalNotesText] = useState<string>('');
+  const [modalStatus, setModalStatus] = useState<ProcurementStatus>('PR_REQUIRED');
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+
+  const QUICK_TEMPLATES = [
+    'PR sedang diajukan',
+    'Menunggu approval Kadep',
+    'PO sudah terbit',
+    'Estimasi kirim minggu ini',
+    'Barang dalam proses impor',
+    'Stok pengganti tersedia di gudang 2'
+  ];
+
+  const handleOpenModal = (item: InventoryItem) => {
+    setModalPrItem(item);
+    setModalNotesText((item.notes && item.notes.trim() !== '-' && item.notes.trim() !== 'Belum ada keterangan') ? item.notes.trim() : '');
+    const initialStatus: ProcurementStatus = (item.procurement_status === 'PR_PROCESSED' || item.procurement_status === 'ARRIVED') ? 'PR_PROCESSED' : 'PR_REQUIRED';
+    setModalStatus(initialStatus);
+  };
+
+  const handleApplyTemplate = (text: string) => {
+    setModalNotesText(prev => {
+      const trimmed = prev.trim();
+      if (!trimmed) return text;
+      return `${trimmed} • ${text}`;
+    });
+  };
+
+  const handleSaveModal = async () => {
+    if (!modalPrItem) return;
+    const targetItem = modalPrItem;
+    const notesToSave = modalNotesText.trim(); // Clean empty string default
+    const statusToSave = modalStatus;
+
+    // Instant modal close and feedback
+    setModalPrItem(null);
+
+    // Update in background
+    await updateItem(targetItem.id, {
+      notes: notesToSave,
+      procurement_status: statusToSave
+    });
+  };
 
   // Delete item from PR Request modal state (Supervisor only)
   const [deletingPrItem, setDeletingPrItem] = useState<InventoryItem | null>(null);
@@ -134,13 +177,6 @@ export const Dashboard: React.FC = () => {
     });
   };
 
-  const handleSaveNotes = async (item: InventoryItem) => {
-    await updateItem(item.id, {
-      notes: tempNotesText.trim() || 'Belum ada keterangan'
-    });
-    setEditingNotesId(null);
-  };
-
   const handleTriggerSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const q = searchQuery.trim();
@@ -172,7 +208,7 @@ export const Dashboard: React.FC = () => {
       'Unrestricted Stock': `${item.current_stock} ${item.unit}`,
       'ROP / Safety': `${item.min_stock} ${item.unit}`,
       'Status Pengadaan': item.procurement_status === 'PR_PROCESSED' ? 'Hijau: Sudah Diproses' : 'Merah: PR Request',
-      'Keterangan Evaluator': item.notes || 'Belum ada keterangan',
+      'Keterangan Evaluator': (item.notes && item.notes !== '-' && item.notes !== 'Belum ada keterangan') ? item.notes : '',
       'Terakhir Diperbarui': `${item.updated_by}, ${formatDateTime24(item.updated_at)}`
     }));
 
@@ -530,8 +566,8 @@ export const Dashboard: React.FC = () => {
                 <th className="py-3.5 px-4">NAMA BARANG & LOKASI</th>
                 <th className="py-3.5 px-4 text-center">UNRESTRICTED STOCK</th>
                 <th className="py-3.5 px-4 text-center">ROP</th>
-                <th className="py-3.5 px-4">STATUS PENGADAAN (EVALUATOR)</th>
-                <th className="py-3.5 px-4 min-w-[340px]">NOMOR PR (PURCHASE REQUISITION) & KETERANGAN</th>
+                <th className="py-3.5 px-4">STATUS PENGADAAN</th>
+                <th className="py-3.5 px-4 min-w-[260px]">KETERANGAN EVALUATOR</th>
                 <th className="py-3.5 px-4">TERAKHIR DIPERBARUI</th>
                 <th className="py-3.5 px-4 text-center min-w-[100px]">AKSI</th>
               </tr>
@@ -571,8 +607,7 @@ export const Dashboard: React.FC = () => {
               ) : (
                 displayedItems.map((item) => {
                   const isProcessed = item.procurement_status === 'PR_PROCESSED' || item.procurement_status === 'ARRIVED';
-                  const isEditingNotes = editingNotesId === item.id;
-                  const hasPrNotes = Boolean(item.notes && item.notes !== '-' && item.notes !== 'Belum ada keterangan');
+                  const hasPrNotes = Boolean(item.notes && item.notes.trim() !== '' && item.notes.trim() !== '-' && item.notes.trim() !== 'Belum ada keterangan');
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/70 transition">
@@ -621,6 +656,7 @@ export const Dashboard: React.FC = () => {
                         {item.min_stock} {item.unit}
                       </td>
 
+                      {/* STATUS PENGADAAN */}
                       <td className="py-4 px-4 whitespace-nowrap">
                         {canManagePR ? (
                           <select
@@ -635,8 +671,8 @@ export const Dashboard: React.FC = () => {
                                 : 'bg-rose-50 text-rose-800 border-rose-300'
                             }`}
                           >
-                            <option value="PROCESSED">🟢 Hijau: Sudah Diproses</option>
                             <option value="PR_REQUIRED">🔴 Merah: PR Request</option>
+                            <option value="PROCESSED">🟢 Hijau: Sudah Diproses</option>
                           </select>
                         ) : (
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold ${
@@ -649,83 +685,40 @@ export const Dashboard: React.FC = () => {
                         )}
                       </td>
 
-                      {/* Prominent PR Number Column */}
-                      <td className="py-4 px-4 min-w-[340px]">
-                        {isEditingNotes ? (
-                          <div className="p-3.5 bg-blue-50/95 border-2 border-blue-500 rounded-2xl space-y-2.5 shadow-md animate-in zoom-in-95">
-                            <label className="text-[11px] font-black uppercase text-blue-950 tracking-wider flex items-center gap-1.5">
-                              <FileText className="w-4 h-4 text-blue-700" />
-                              <span>Nomor PR (Purchase Requisition) SAP:</span>
-                            </label>
-                            <input
-                              type="text"
-                              value={tempNotesText}
-                              onChange={(e) => setTempNotesText(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveNotes(item);
-                                if (e.key === 'Escape') setEditingNotesId(null);
-                              }}
-                              placeholder="Ketik Nomor PR (cth: PR-2026-0089 atau 10029381)..."
-                              className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border-2 border-blue-400 focus:border-blue-600 rounded-xl font-mono font-black text-slate-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 placeholder:font-sans"
-                              autoFocus
-                            />
-                            <div className="flex items-center gap-2">
+                      {/* KETERANGAN EVALUATOR */}
+                      <td className="py-4 px-4 min-w-[260px]">
+                        {hasPrNotes ? (
+                          <div className="space-y-1">
+                            <p className="text-xs text-slate-800 font-medium leading-relaxed break-words">
+                              {item.notes}
+                            </p>
+                            {canManagePR && (
                               <button
-                                onClick={() => handleSaveNotes(item)}
-                                className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-black transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                                type="button"
+                                onClick={() => handleOpenModal(item)}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                               >
-                                <Check className="w-4 h-4" />
-                                <span>Simpan Nomor PR</span>
+                                <PenSquare className="w-3.5 h-3.5 text-blue-600" />
+                                <span>+ Tulis Keterangan</span>
                               </button>
-                              <button
-                                onClick={() => setEditingNotesId(null)}
-                                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-                              >
-                                Batal
-                              </button>
-                            </div>
+                            )}
                           </div>
                         ) : (
-                          <div className="space-y-1.5">
-                            {hasPrNotes ? (
-                              <div className="flex items-center justify-between gap-2 p-2 px-3 bg-blue-50 border-2 border-blue-200/90 rounded-xl shadow-2xs">
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <FileText className="w-4 h-4 text-blue-700 shrink-0" />
-                                  <span className="font-mono font-black text-xs sm:text-sm text-blue-950 tracking-wide truncate">
-                                    {item.notes}
-                                  </span>
-                                </div>
-                                {canManagePR && (
-                                  <button
-                                    onClick={() => {
-                                      setEditingNotesId(item.id);
-                                      setTempNotesText(item.notes || '');
-                                    }}
-                                    className="px-2 py-1 bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
-                                    title="Ubah Nomor PR"
-                                  >
-                                    <Edit3 className="w-3 h-3" />
-                                    <span>Ubah</span>
-                                  </button>
-                                )}
-                              </div>
+                          <div className="space-y-1">
+                            <div className="text-slate-400 italic text-xs leading-none">
+                              - Belum ada keterangan -
+                            </div>
+                            {canManagePR ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenModal(item)}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 transition cursor-pointer group"
+                              >
+                                <PenSquare className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition" />
+                                <span>+ Tulis Keterangan</span>
+                              </button>
                             ) : (
-                              <div>
-                                {canManagePR ? (
-                                  <button
-                                    onClick={() => {
-                                      setEditingNotesId(item.id);
-                                      setTempNotesText('');
-                                    }}
-                                    className="w-full py-2.5 px-3 border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50/70 rounded-xl text-xs font-bold text-blue-700 flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs group"
-                                  >
-                                    <Plus className="w-4 h-4 text-blue-600 group-hover:scale-110 transition" />
-                                    <span>Isi Nomor Dokumen PR</span>
-                                  </button>
-                                ) : (
-                                  <span className="text-xs text-slate-400 italic">Belum ada nomor PR</span>
-                                )}
-                              </div>
+                              <span className="text-xs text-slate-300">-</span>
                             )}
                           </div>
                         )}
@@ -770,6 +763,147 @@ export const Dashboard: React.FC = () => {
         <div className="fixed bottom-6 right-6 z-50 p-4 bg-emerald-600 text-white rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold animate-in fade-in">
           <CheckCircle2 className="w-4 h-4" />
           <span>{deleteItemFeedback}</span>
+        </div>
+      )}
+
+      {/* Modal Keterangan PR Request (Khusus Evaluator) */}
+      {modalPrItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="bg-slate-900 px-5 py-4 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
+                    Keterangan PR Request (Khusus Evaluator)
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Catat nomor PR, progres PO, tindak lanjut, atau instruksi pengadaan
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalPrItem(null)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Item Info Summary Card */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-xs bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-slate-800 shadow-2xs">
+                    {modalPrItem.material_no}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                    {modalPrItem.contract_type === 'NON_FPA' ? 'Non-FPA' : 'FPA'}
+                  </span>
+                </div>
+                <h4 className="font-black text-slate-900 text-sm uppercase tracking-tight">
+                  {modalPrItem.name}
+                </h4>
+                <div className="text-xs text-slate-600 font-medium flex items-center gap-2">
+                  <span>Stok Fisik: <strong className="text-rose-600">{modalPrItem.current_stock} {modalPrItem.unit}</strong></span>
+                  <span>•</span>
+                  <span>Batas ROP: <strong className="text-slate-800">{modalPrItem.min_stock} {modalPrItem.unit}</strong></span>
+                </div>
+              </div>
+
+              {/* Status Pengadaan */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-2">
+                  Status Pengadaan:
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setModalStatus('PR_REQUIRED')}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer border-2 ${
+                      modalStatus === 'PR_REQUIRED' || modalStatus === 'MINIMUM'
+                        ? 'bg-rose-50 border-rose-500 text-rose-900 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse"></span>
+                    <span>🔴 PR Request</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalStatus('PR_PROCESSED')}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer border-2 ${
+                      modalStatus === 'PR_PROCESSED' || modalStatus === 'ARRIVED'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                    <span>🟢 Sudah Diproses</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Tulis Keterangan */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  Tulis Keterangan / Tindak Lanjut PR:
+                </label>
+                <textarea
+                  rows={3}
+                  value={modalNotesText}
+                  onChange={(e) => setModalNotesText(e.target.value)}
+                  placeholder="Contoh: Nomor PR: PR-2026-09-089 sudah dibuat, menunggu approval Dept Head / PO sudah diterbitkan ke vendor..."
+                  className="w-full p-3 bg-white border border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 resize-none transition"
+                />
+              </div>
+
+              {/* Template Cepat */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-2">
+                  Template Cepat:
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {QUICK_TEMPLATES.map((tmpl) => (
+                    <button
+                      key={tmpl}
+                      type="button"
+                      onClick={() => handleApplyTemplate(tmpl)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 border border-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition cursor-pointer shadow-2xs"
+                    >
+                      + {tmpl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setModalPrItem(null)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 font-bold text-xs rounded-xl hover:bg-slate-200 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveModal}
+                disabled={isSavingNotes}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md transition cursor-pointer disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" />
+                <span>{isSavingNotes ? 'Menyimpan...' : 'Simpan Keterangan'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -363,40 +363,49 @@ export class SyncManager {
     this.broadcastMutation();
     this.notifyDataChanged();
 
-    // 2. Cloud SQL
-    try {
-      if (this.isOnline) {
-        await fetch('/api/items', {
+    // 2. Parallelize Cloud SQL + Firestore in background
+    const syncPromises: Promise<unknown>[] = [];
+
+    if (this.isOnline) {
+      // Cloud SQL Sync
+      syncPromises.push(
+        fetch('/api/items', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cleaned),
-        });
-        this.lastSyncedAt = new Date();
-        this.isSqlConnected = true;
-      }
-    } catch (err) {
-      console.warn('SQL saveItem notice:', err);
-    }
+        }).then(() => {
+          this.lastSyncedAt = new Date();
+          this.isSqlConnected = true;
+        }).catch(err => {
+          console.warn('SQL saveItem notice:', err);
+        })
+      );
 
-    // 3. Firestore
-    try {
-      if (this.isOnline) {
-        await setDoc(doc(db, 'items', item.id), cleaned);
-        this.isFirestoreConnected = true;
-      } else {
-        await addPendingSync({
+      // Firestore Sync
+      syncPromises.push(
+        setDoc(doc(db, 'items', item.id), cleaned)
+          .then(() => {
+            this.isFirestoreConnected = true;
+          })
+          .catch(err => {
+            handleFirestoreError(err, OperationType.WRITE, `items/${item.id}`);
+          })
+      );
+    } else {
+      syncPromises.push(
+        addPendingSync({
           id: `item-${item.id}-${Date.now()}`,
           collection: 'items',
           action: 'set',
           data: cleaned,
           timestamp: Date.now()
-        });
-        this.pendingCount++;
-      }
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `items/${item.id}`);
+        }).then(() => {
+          this.pendingCount++;
+        })
+      );
     }
 
+    await Promise.allSettled(syncPromises);
     this.notifyStatus();
   }
 

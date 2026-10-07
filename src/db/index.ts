@@ -16,16 +16,22 @@ export const createPool = () => {
       password: process.env.SQL_PASSWORD,
       database: process.env.SQL_DB_NAME,
       port: 5432,
-      max: 5,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-      maxUses: 100,
+      max: 10,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 3000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
+      allowExitOnIdle: false,
     });
 
     // Prevent unhandled pool-level errors from crashing the application
     global._postgresPool.on('error', (err) => {
-      // Quietly log idle pool client cleanup
-      if (err?.message?.includes('EPIPE') || err?.message?.includes('ECONNRESET')) {
+      // Quietly handle idle pool client resets/disconnects
+      if (
+        err?.message?.includes('EPIPE') || 
+        err?.message?.includes('ECONNRESET') ||
+        err?.message?.includes('Connection terminated')
+      ) {
         return;
       }
       console.error('Unexpected error on idle SQL pool client:', err);

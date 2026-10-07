@@ -167,7 +167,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         updated_by: currentUser?.username || 'supervisor',
-        notes: itemData.notes || '-'
+        notes: itemData.notes || ''
       };
 
       // 1. Save item to storage
@@ -239,11 +239,17 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         procurement_status: status,
         updated_at: new Date().toISOString(),
         updated_by: currentUser?.username || 'supervisor',
-        notes: updates.notes ?? existing.notes ?? '-'
+        notes: updates.notes ?? existing.notes ?? ''
       };
 
-      await syncManager.saveItem(mergedItem);
-      await refreshLocalState();
+      // 1. Instant optimistic state update (<1ms reaction in UI)
+      setItems(prev => prev.map(i => i.id === id ? mergedItem : i));
+
+      // 2. Background persistent save (IndexedDB + Cloud SQL + Firestore)
+      syncManager.saveItem(mergedItem).catch(err => {
+        console.warn('Background sync error on updateItem:', err);
+      });
+
       return { success: true, message: 'Data master barang berhasil diperbarui.' };
     } catch (err) {
       return { success: false, message: `Gagal memperbarui barang: ${err instanceof Error ? err.message : String(err)}` };
