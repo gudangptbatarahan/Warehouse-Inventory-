@@ -170,35 +170,39 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         notes: itemData.notes || ''
       };
 
-      // 1. Save item to storage
-      await syncManager.saveItem(newItem);
+      // 1. Generate initial balance IN transaction if initialStock > 0
+      const initTx: StockTransaction | null = initialStock > 0 ? {
+        id: `tx-init-${paddedMaterialNo}-${Date.now()}`,
+        item_id: newItem.id,
+        material_no: paddedMaterialNo,
+        item_name: newItem.name,
+        type: 'IN',
+        quantity: initialStock,
+        balance_before: 0,
+        balance_after: initialStock,
+        doc_ref: 'BA-SALDO-AWAL-SYSTEM',
+        pic_name: currentUser?.name || 'Administrator Gudang',
+        operator_username: currentUser?.username || 'supervisor',
+        operator_group: currentGroup || 'Group A',
+        notes: 'Saldo awal registrasi master barang baru',
+        timestamp: new Date().toISOString()
+      } : null;
 
-      // 2. If initialStock > 0, generate initial balance IN transaction safely wrapped in try-catch
-      if (initialStock > 0) {
-        try {
-          const initTx: StockTransaction = {
-            id: `tx-init-${paddedMaterialNo}-${Date.now()}`,
-            item_id: newItem.id,
-            material_no: paddedMaterialNo,
-            item_name: newItem.name,
-            type: 'IN',
-            quantity: initialStock,
-            balance_before: 0,
-            balance_after: initialStock,
-            doc_ref: 'BA-SALDO-AWAL-SYSTEM',
-            pic_name: currentUser?.name || 'Administrator Gudang',
-            operator_username: currentUser?.username || 'supervisor',
-            operator_group: currentGroup || 'Group A',
-            notes: 'Saldo awal registrasi master barang baru',
-            timestamp: new Date().toISOString()
-          };
-          await syncManager.saveTransaction(initTx);
-        } catch (txError) {
-          console.warn('Initial transaction warning (item still saved):', txError);
-        }
+      // 2. Instant optimistic UI update (<1ms)
+      setItems(prev => [newItem, ...prev]);
+      if (initTx) {
+        setTransactions(prev => [initTx, ...prev]);
       }
 
-      await refreshLocalState();
+      // 3. Background sync
+      const bgPromises: Promise<unknown>[] = [syncManager.saveItem(newItem)];
+      if (initTx) {
+        bgPromises.push(syncManager.saveTransaction(initTx));
+      }
+      Promise.allSettled(bgPromises).catch(err => {
+        console.warn('Background sync error on addItem:', err);
+      });
+
       return { success: true, message: `Barang ${newItem.name} (${paddedMaterialNo}) berhasil ditambahkan.`, item: newItem };
     } catch (err) {
       console.error('Failed to add item:', err);
@@ -346,9 +350,15 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updated_by: currentUser?.username || 'staff'
       };
 
-      await syncManager.saveTransaction(newTx);
-      await syncManager.saveItem(updatedItem);
-      await refreshLocalState();
+      // 1. Instant optimistic state update (<1ms)
+      setTransactions(prev => [newTx, ...prev]);
+      setItems(prev => prev.map(i => i.id === item.id ? updatedItem : i));
+
+      // 2. Background persistent sync
+      Promise.allSettled([
+        syncManager.saveTransaction(newTx),
+        syncManager.saveItem(updatedItem)
+      ]).catch(err => console.warn('Background sync mutation error:', err));
 
       return { 
         success: true, 
@@ -379,6 +389,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       let newBalanceAfter = tx.balance_after;
       let newQty = tx.quantity;
+      let updatedItem: InventoryItem | null = null;
 
       if (updates.quantity !== undefined && updates.quantity !== tx.quantity) {
         newQty = Number(updates.quantity);
@@ -387,28 +398,30 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
 
         const delta = newQty - tx.quantity;
+        let newStock = item.current_stock;
         if (tx.type === 'IN') {
           // If IN increased, current stock increases
-          const adjustedStock = item.current_stock + delta;
-          if (adjustedStock < 0) {
+          newStock = item.current_stock + delta;
+          if (newStock < 0) {
             return { success: false, message: 'Koreksi kuantitas IN akan menyebabkan saldo stok negatif!' };
           }
-          item.current_stock = adjustedStock;
           newBalanceAfter = tx.balance_before + newQty;
         } else if (tx.type === 'OUT') {
           // If OUT increased, current stock decreases
-          const adjustedStock = item.current_stock - delta;
-          if (adjustedStock < 0) {
+          newStock = item.current_stock - delta;
+          if (newStock < 0) {
             return { success: false, message: `Koreksi kuantitas OUT melebihi saldo fisik (${item.current_stock} ${item.unit})!` };
           }
-          item.current_stock = adjustedStock;
           newBalanceAfter = tx.balance_before - newQty;
         }
 
-        item.procurement_status = evaluateProcurementStatus(item.current_stock, item.min_stock);
-        item.updated_at = new Date().toISOString();
-        item.updated_by = currentUser?.username || 'supervisor';
-        await syncManager.saveItem(item);
+        updatedItem = {
+          ...item,
+          current_stock: newStock,
+          procurement_status: evaluateProcurementStatus(newStock, item.min_stock),
+          updated_at: new Date().toISOString(),
+          updated_by: currentUser?.username || 'supervisor'
+        };
       }
 
       const updatedTx: StockTransaction = {
@@ -421,8 +434,18 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         timestamp: updates.timestamp !== undefined ? updates.timestamp.trim() : tx.timestamp
       };
 
-      await syncManager.saveTransaction(updatedTx);
-      await refreshLocalState();
+      // 1. Instant optimistic state update
+      setTransactions(prev => prev.map(t => t.id === txId ? updatedTx : t));
+      if (updatedItem) {
+        setItems(prev => prev.map(i => i.id === updatedItem!.id ? updatedItem! : i));
+      }
+
+      // 2. Background sync
+      Promise.allSettled([
+        syncManager.saveTransaction(updatedTx),
+        updatedItem ? syncManager.saveItem(updatedItem) : Promise.resolve()
+      ]).catch(err => console.warn('Background sync error on updateTransaction:', err));
+
       return { success: true, message: 'Koreksi transaksi berhasil disimpan dan saldo stok telah disesuaikan.' };
     } catch (err) {
       return { success: false, message: `Gagal memperbarui transaksi: ${err instanceof Error ? err.message : String(err)}` };
@@ -438,21 +461,36 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       const item = items.find(i => i.id === tx.item_id);
+      let updatedItem: InventoryItem | null = null;
       if (item) {
+        let revertedStock = item.current_stock;
         // Revert stock impact
         if (tx.type === 'IN') {
-          item.current_stock = Math.max(0, item.current_stock - tx.quantity);
+          revertedStock = Math.max(0, item.current_stock - tx.quantity);
         } else if (tx.type === 'OUT') {
-          item.current_stock = item.current_stock + tx.quantity;
+          revertedStock = item.current_stock + tx.quantity;
         }
-        item.procurement_status = evaluateProcurementStatus(item.current_stock, item.min_stock);
-        item.updated_at = new Date().toISOString();
-        item.updated_by = currentUser?.username || 'supervisor';
-        await syncManager.saveItem(item);
+        updatedItem = {
+          ...item,
+          current_stock: revertedStock,
+          procurement_status: evaluateProcurementStatus(revertedStock, item.min_stock),
+          updated_at: new Date().toISOString(),
+          updated_by: currentUser?.username || 'supervisor'
+        };
       }
 
-      await syncManager.deleteTransaction(txId);
-      await refreshLocalState();
+      // 1. Instant optimistic state update (<1ms)
+      setTransactions(prev => prev.filter(t => t.id !== txId));
+      if (updatedItem) {
+        setItems(prev => prev.map(i => i.id === updatedItem!.id ? updatedItem! : i));
+      }
+
+      // 2. Background sync
+      Promise.allSettled([
+        syncManager.deleteTransaction(txId),
+        updatedItem ? syncManager.saveItem(updatedItem) : Promise.resolve()
+      ]).catch(err => console.warn('Background sync deleteTransaction error:', err));
+
       return { success: true, message: 'Riwayat mutasi berhasil dihapus dan saldo stok telah dikembalikan.' };
     } catch (err) {
       return { success: false, message: `Gagal menghapus transaksi: ${err instanceof Error ? err.message : String(err)}` };
@@ -502,7 +540,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         applied_to_stock: data.applyToStock
       };
 
-      await syncManager.saveStockTake(stoRecord);
+      // 1. Instant optimistic state update for STO
+      setStockTakes(prev => [stoRecord, ...prev]);
+
+      const bgPromises: Promise<unknown>[] = [
+        syncManager.saveStockTake(stoRecord)
+      ];
 
       // If user chose to apply variance to system stock balance
       if (data.applyToStock && variance !== 0) {
@@ -531,11 +574,17 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           updated_by: currentUser?.username || 'supervisor'
         };
 
-        await syncManager.saveTransaction(stoTx);
-        await syncManager.saveItem(updatedItem);
+        setTransactions(prev => [stoTx, ...prev]);
+        setItems(prev => prev.map(i => i.id === item.id ? updatedItem : i));
+
+        bgPromises.push(syncManager.saveTransaction(stoTx));
+        bgPromises.push(syncManager.saveItem(updatedItem));
       }
 
-      await refreshLocalState();
+      Promise.allSettled(bgPromises).catch(err => {
+        console.warn('Background sync error on addStockTake:', err);
+      });
+
       return { 
         success: true, 
         message: `Audit STO berhasil disimpan. Status: ${status} (Selisih: ${variance} ${item.unit})${data.applyToStock ? ' & Saldo sistem disesuaikan' : ''}.` 
@@ -605,7 +654,30 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     if (itemsToSave.length > 0) {
-      // 1. Instant optimistic state update (<10ms)
+      // 1. Generate initial balance IN transactions for items with current_stock > 0
+      const initTxs: StockTransaction[] = [];
+      for (const it of itemsToSave) {
+        if (it.current_stock > 0) {
+          initTxs.push({
+            id: `tx-init-${it.material_no}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            item_id: it.id,
+            material_no: it.material_no,
+            item_name: it.name,
+            type: 'IN',
+            quantity: it.current_stock,
+            balance_before: 0,
+            balance_after: it.current_stock,
+            doc_ref: 'BA-SALDO-AWAL-IMPORT',
+            pic_name: currentUserTag,
+            operator_username: currentUser?.username || 'supervisor',
+            operator_group: currentGroup || 'Group A',
+            notes: 'Saldo awal dari import spreadsheet data master',
+            timestamp: now
+          });
+        }
+      }
+
+      // 2. Instant optimistic state update (<10ms)
       setItems(prev => {
         const itemMap = new Map(prev.map(i => [i.id, i]));
         for (const item of itemsToSave) {
@@ -614,9 +686,15 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return Array.from(itemMap.values());
       });
 
-      // 2. Persist to local & remote in background
-      await syncManager.saveItemsBatch(itemsToSave);
-      await refreshLocalState();
+      if (initTxs.length > 0) {
+        setTransactions(prev => [...initTxs, ...prev]);
+      }
+
+      // 3. Persist to local & remote in background
+      syncManager.saveItemsBatch(itemsToSave).catch(err => console.warn('Sync items batch error:', err));
+      for (const tx of initTxs) {
+        syncManager.saveTransaction(tx).catch(err => console.warn('Sync init tx error:', err));
+      }
     }
 
     return { imported, updated, failed };

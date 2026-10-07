@@ -441,22 +441,16 @@ export const TransactionsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={async () => {
-                  setIsDeleting(true);
-                  const res = await deleteTransaction(deletingTx.id);
-                  setIsDeleting(false);
-                  if (res.success) {
-                    setDeleteFeedback(res.message);
-                    setDeletingTx(null);
-                    setTimeout(() => setDeleteFeedback(''), 4000);
-                  } else {
-                    alert(res.message);
-                  }
+                  const txId = deletingTx.id;
+                  setDeletingTx(null);
+                  setDeleteFeedback('Riwayat mutasi berhasil dihapus.');
+                  setTimeout(() => setDeleteFeedback(''), 4000);
+                  await deleteTransaction(txId);
                 }}
-                disabled={isDeleting}
                 className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-md cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus'}</span>
+                <span>Ya, Hapus</span>
               </button>
             </div>
           </div>

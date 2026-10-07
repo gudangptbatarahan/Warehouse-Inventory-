@@ -280,18 +280,10 @@ export const BinCardPage: React.FC = () => {
 
   const handleConfirmDeleteTx = async () => {
     if (!deletingTx) return;
-    setIsDeletingTx(true);
-    try {
-      const res = await deleteTransaction(deletingTx.id);
-      if (res.success) {
-        setIsDeleteTxConfirmOpen(false);
-        showToast(res.message);
-      } else {
-        alert(res.message);
-      }
-    } finally {
-      setIsDeletingTx(false);
-    }
+    const txId = deletingTx.id;
+    setIsDeleteTxConfirmOpen(false);
+    showToast('Riwayat mutasi berhasil dihapus.');
+    await deleteTransaction(txId);
   };
 
   // Set current time helper

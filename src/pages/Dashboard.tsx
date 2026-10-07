@@ -607,7 +607,13 @@ export const Dashboard: React.FC = () => {
               ) : (
                 displayedItems.map((item) => {
                   const isProcessed = item.procurement_status === 'PR_PROCESSED' || item.procurement_status === 'ARRIVED';
-                  const hasPrNotes = Boolean(item.notes && item.notes.trim() !== '' && item.notes.trim() !== '-' && item.notes.trim() !== 'Belum ada keterangan');
+                  const hasPrNotes = Boolean(
+                    item.notes && 
+                    item.notes.trim() !== '' && 
+                    item.notes.trim() !== '-' && 
+                    item.notes.trim() !== 'Belum ada keterangan' &&
+                    item.notes.trim() !== '- Belum ada keterangan -'
+                  );
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/70 transition">
