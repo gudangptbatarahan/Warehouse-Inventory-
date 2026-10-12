@@ -64,7 +64,16 @@ export const Dashboard: React.FC = () => {
 
   const handleOpenModal = (item: InventoryItem) => {
     setModalPrItem(item);
-    setModalNotesText((item.notes && item.notes.trim() !== '-' && item.notes.trim() !== 'Belum ada keterangan') ? item.notes.trim() : '');
+    const rawNotes = (item.notes || '').trim();
+    const isNumberOnly = /^\d+$/.test(rawNotes);
+    const initialText = (
+      rawNotes && 
+      !isNumberOnly &&
+      rawNotes !== '-' && 
+      rawNotes !== 'Belum ada keterangan' && 
+      rawNotes !== '- Belum ada keterangan -'
+    ) ? rawNotes : '';
+    setModalNotesText(initialText);
     const initialStatus: ProcurementStatus = (item.procurement_status === 'PR_PROCESSED' || item.procurement_status === 'ARRIVED') ? 'PR_PROCESSED' : 'PR_REQUIRED';
     setModalStatus(initialStatus);
   };
@@ -607,12 +616,14 @@ export const Dashboard: React.FC = () => {
               ) : (
                 displayedItems.map((item) => {
                   const isProcessed = item.procurement_status === 'PR_PROCESSED' || item.procurement_status === 'ARRIVED';
+                  const rawNotes = item.notes?.trim() || '';
+                  const isNumberOnly = /^\d+$/.test(rawNotes);
                   const hasPrNotes = Boolean(
-                    item.notes && 
-                    item.notes.trim() !== '' && 
-                    item.notes.trim() !== '-' && 
-                    item.notes.trim() !== 'Belum ada keterangan' &&
-                    item.notes.trim() !== '- Belum ada keterangan -'
+                    rawNotes !== '' && 
+                    !isNumberOnly &&
+                    rawNotes !== '-' && 
+                    rawNotes !== 'Belum ada keterangan' &&
+                    rawNotes !== '- Belum ada keterangan -'
                   );
 
                   return (

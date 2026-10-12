@@ -157,7 +157,7 @@ export const ImportExportPage: React.FC = () => {
         ]);
 
         const colNotes = detectColumn(headers, [
-          'notes', 'keterangan', 'catatan', 'remark', 'nopr', 'pr', 'nomorpr', 'prnumber'
+          'keterangan_evaluator', 'catatan_evaluator', 'evaluator_notes', 'keteranganpr', 'catatanpr'
         ]);
 
         // Heuristic Fallbacks if columns were not explicitly named
@@ -194,7 +194,8 @@ export const ImportExportPage: React.FC = () => {
           const curStock = Number(row[colStock || '0']) || 0;
           const minStock = Number(row[colMin || '5']) || 5;
           const maxStock = Number(row[colMax || String(Math.max(curStock * 2, minStock * 3, 20))]) || 50;
-          const notesVal = String(row[colNotes || ''] || '-').trim();
+          const rawNotes = String(row[colNotes || ''] || '').trim();
+          const notesVal = (/^\d+$/.test(rawNotes) || rawNotes === '-' || rawNotes === 'Belum ada keterangan') ? '' : rawNotes;
 
           const isDuplicate = Boolean(paddedMaterialNo && seenCodes.has(paddedMaterialNo));
           let isEliminated = false;

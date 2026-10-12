@@ -67,23 +67,72 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Reload data from IndexedDB
+  const processLoadedData = useCallback((dbData: { items: InventoryItem[]; transactions: StockTransaction[]; stockTakes: StockTake[] }) => {
+    // 1. Sanitize notes (if notes is purely row index digits '1', '2', '3'..., clean to '')
+    const sanitizedItems = dbData.items.map(it => {
+      const raw = (it.notes || '').trim();
+      if (/^\d+$/.test(raw) || raw === '-' || raw === 'Belum ada keterangan') {
+        return { ...it, notes: '' };
+      }
+      return it;
+    });
+
+    // 2. Ensure every single inventory item has an initial balance transaction in history
+    const existingTxItemIds = new Set(dbData.transactions.map(t => t.item_id || t.material_no));
+    const backfilledTxs: StockTransaction[] = [...dbData.transactions];
+    const missingTxsToPersist: StockTransaction[] = [];
+
+    for (const item of sanitizedItems) {
+      if (!existingTxItemIds.has(item.id) && !existingTxItemIds.has(item.material_no)) {
+        const initTx: StockTransaction = {
+          id: `tx-init-${item.material_no}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          item_id: item.id,
+          material_no: item.material_no,
+          item_name: item.name,
+          type: 'IN',
+          quantity: item.current_stock,
+          balance_before: 0,
+          balance_after: item.current_stock,
+          doc_ref: 'BA-SALDO-AWAL-REGISTRASI',
+          pic_name: 'Administrator Gudang',
+          operator_username: 'supervisor',
+          operator_group: 'Group A',
+          notes: 'Saldo awal master barang',
+          timestamp: item.created_at || new Date().toISOString()
+        };
+        backfilledTxs.push(initTx);
+        missingTxsToPersist.push(initTx);
+        existingTxItemIds.add(item.id);
+        existingTxItemIds.add(item.material_no);
+      }
+    }
+
+    setItems(sanitizedItems);
+    setTransactions(backfilledTxs.sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    ));
+    setStockTakes([...dbData.stockTakes].sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    ));
+
+    // Background persist missing transactions & cleaned notes
+    if (missingTxsToPersist.length > 0) {
+      for (const tx of missingTxsToPersist) {
+        syncManager.saveTransaction(tx).catch(e => console.warn('Background sync missing tx:', e));
+      }
+    }
+  }, []);
+
   const refreshLocalState = useCallback(async () => {
     try {
       const dbData = await syncManager.initialize();
-      setItems(dbData.items);
-      // Sort transactions descending (newest first)
-      setTransactions([...dbData.transactions].sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      ));
-      setStockTakes([...dbData.stockTakes].sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      ));
+      processLoadedData(dbData);
     } catch (err) {
       console.error('Failed to refresh inventory state:', err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [processLoadedData]);
 
   // Initialize and register listeners
   useEffect(() => {
@@ -91,13 +140,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     syncManager.initialize().then(initialData => {
       if (!isMounted) return;
-      setItems(initialData.items);
-      setTransactions([...initialData.transactions].sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      ));
-      setStockTakes([...initialData.stockTakes].sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      ));
+      processLoadedData(initialData);
       setIsLoading(false);
     });
 
@@ -114,7 +157,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       unsubStatus();
       unsubData();
     };
-  }, [refreshLocalState]);
+  }, [refreshLocalState, processLoadedData]);
 
   const getItemById = useCallback((id: string): InventoryItem | undefined => {
     return items.find(item => item.id === id);
