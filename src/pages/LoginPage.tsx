@@ -6,24 +6,31 @@ import {
   KeyRound, 
   Eye, 
   EyeOff, 
-  ArrowRight
+  ArrowRight,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isReviewer, currentUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      if (isReviewer || currentUser?.role === 'reviewer') {
+        navigate('/items', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isReviewer, currentUser, navigate]);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const isReviewerTyped = username.trim().toLowerCase() === 'reviewer';
 
   const handleManualLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +38,11 @@ export const LoginPage: React.FC = () => {
 
     const success = login(username, password);
     if (success) {
-      navigate('/dashboard');
+      if (username.trim().toLowerCase() === 'reviewer') {
+        navigate('/items');
+      } else {
+        navigate('/dashboard');
+      }
     } else {
       setErrorMsg('Username akun atau kata sandi tidak valid.');
     }
@@ -118,18 +129,25 @@ export const LoginPage: React.FC = () => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-800">
-                  KATA SANDI (PASSWORD)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-800">
+                    KATA SANDI (PASSWORD)
+                  </label>
+                  {isReviewerTyped && (
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      Bebas / Tanpa Password
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Masukkan kata sandi..."
+                    placeholder={isReviewerTyped ? "Kosongkan kata sandi (login instan)..." : "Masukkan kata sandi..."}
                     className="w-full pl-10 pr-11 py-3 bg-[#E8EFF7] border border-slate-200/90 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:bg-white focus:border-blue-500"
-                    required
+                    required={!isReviewerTyped}
                   />
                   <button
                     type="button"
@@ -139,6 +157,12 @@ export const LoginPage: React.FC = () => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {isReviewerTyped && (
+                  <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1.5 pt-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Akun Reviewer dapat langsung masuk tanpa mengisi kata sandi.</span>
+                  </p>
+                )}
               </div>
 
               <button
@@ -149,6 +173,25 @@ export const LoginPage: React.FC = () => {
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
+
+            {/* Akses Instan Akun Reviewer (Khusus Cari Barang & Scan QR) */}
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setUsername('Reviewer');
+                  setPassword('');
+                  const success = login('Reviewer', '');
+                  if (success) {
+                    navigate('/items');
+                  }
+                }}
+                className="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-slate-500" />
+                <span>Masuk Cepat sebagai Reviewer (Tanpa Password)</span>
+              </button>
+            </div>
           </div>
         </div>
       </main>

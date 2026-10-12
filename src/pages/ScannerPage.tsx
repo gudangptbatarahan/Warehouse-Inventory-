@@ -19,12 +19,14 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
+import { useAuth } from '../context/AuthContext';
 import { InventoryItem } from '../types/inventory';
 import { padTo18Digits } from '../utils/materialUtils';
 
 export const ScannerPage: React.FC = () => {
   const navigate = useNavigate();
   const { items, getItemById, getItemByMaterialNo } = useInventory();
+  const { canMutateStock } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'QR' | 'OCR' | 'MANUAL'>('QR');
 
@@ -581,21 +583,25 @@ export const ScannerPage: React.FC = () => {
               <span>Buka Kartu Bin Card</span>
             </button>
 
-            <button
-              onClick={() => navigate(`/transactions?action=in&item=${matchedItem.id}`)}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-[#10B981] hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Mutasi IN</span>
-            </button>
+            {canMutateStock && (
+              <>
+                <button
+                  onClick={() => navigate(`/transactions?action=in&item=${matchedItem.id}`)}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-[#10B981] hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Mutasi IN</span>
+                </button>
 
-            <button
-              onClick={() => navigate(`/transactions?action=out&item=${matchedItem.id}`)}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-            >
-              <MinusCircle className="w-4 h-4" />
-              <span>Mutasi OUT</span>
-            </button>
+                <button
+                  onClick={() => navigate(`/transactions?action=out&item=${matchedItem.id}`)}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                >
+                  <MinusCircle className="w-4 h-4" />
+                  <span>Mutasi OUT</span>
+                </button>
+              </>
+            )}
 
             <button
               onClick={() => {

@@ -31,7 +31,7 @@ import {
 
 export const ItemsPage: React.FC = () => {
   const { items, addItem, updateItem, deleteItem, clearAllData } = useInventory();
-  const { canManageMaster, canDeleteMaster } = useAuth();
+  const { canManageMaster, canDeleteMaster, canImportExport, canExportMaster } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -283,40 +283,44 @@ export const ItemsPage: React.FC = () => {
             </button>
           )}
 
-          <button
-            onClick={() => navigate('/import')}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Import Excel / CSV</span>
-          </button>
+          {canImportExport && (
+            <button
+              onClick={() => navigate('/import')}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Import Excel / CSV</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => {
-              const exportRows = filteredItems.map((item, idx) => ({
-                No: idx + 1,
-                'Material Number': item.material_no,
-                'Nama Barang': item.name,
-                'Spesifikasi': item.specification || '-',
-                'Kategori': item.category,
-                'Kontrak': item.contract_type,
-                'Lokasi Rak': item.location,
-                'Saldo Fisik': item.current_stock,
-                'Satuan': item.unit,
-                'Min Stock': item.min_stock,
-                'Max Stock': item.max_stock,
-                'Status': item.procurement_status
-              }));
-              const ws = XLSX.utils.json_to_sheet(exportRows);
-              const wb = XLSX.utils.book_new();
-              XLSX.utils.book_append_sheet(wb, ws, 'Master Barang');
-              XLSX.writeFile(wb, `MASTER_BARANG_${Date.now()}.xlsx`);
-            }}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Ekspor Excel (.xlsx)</span>
-          </button>
+          {canExportMaster && (
+            <button
+              onClick={() => {
+                const exportRows = filteredItems.map((item, idx) => ({
+                  No: idx + 1,
+                  'Material Number': item.material_no,
+                  'Nama Barang': item.name,
+                  'Spesifikasi': item.specification || '-',
+                  'Kategori': item.category,
+                  'Kontrak': item.contract_type,
+                  'Lokasi Rak': item.location,
+                  'Saldo Fisik': item.current_stock,
+                  'Satuan': item.unit,
+                  'Min Stock': item.min_stock,
+                  'Max Stock': item.max_stock,
+                  'Status': item.procurement_status
+                }));
+                const ws = XLSX.utils.json_to_sheet(exportRows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Master Barang');
+                XLSX.writeFile(wb, `MASTER_BARANG_${Date.now()}.xlsx`);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Ekspor Excel (.xlsx)</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -458,13 +462,15 @@ export const ItemsPage: React.FC = () => {
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                          <button
-                            onClick={() => navigate('/import')}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
-                          >
-                            <FileSpreadsheet className="w-4 h-4" />
-                            <span>Upload / Drop File Excel Asli</span>
-                          </button>
+                          {canImportExport && (
+                            <button
+                              onClick={() => navigate('/import')}
+                              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
+                            >
+                              <FileSpreadsheet className="w-4 h-4" />
+                              <span>Upload / Drop File Excel Asli</span>
+                            </button>
+                          )}
                           {canManageMaster && (
                             <button
                               onClick={handleOpenCreate}

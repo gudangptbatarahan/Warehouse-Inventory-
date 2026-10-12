@@ -13,7 +13,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 
 export const Navbar: React.FC = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, isReviewer } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -24,7 +24,7 @@ export const Navbar: React.FC = () => {
           {/* Left Brand: Amber Hexagon Logo + App Title */}
           <div 
             className="flex items-center gap-2.5 sm:gap-3 cursor-pointer shrink-0 min-w-0" 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(isReviewer ? '/items' : '/dashboard')}
           >
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#0B192C] flex items-center justify-center p-2 shadow-sm border border-slate-800 shrink-0">
               <svg 
@@ -47,61 +47,95 @@ export const Navbar: React.FC = () => {
 
           {/* Center Navigation Tabs (Dashboard, Manajemen Barang, Riwayat Mutasi, etc.) */}
           <nav className="hidden lg:flex items-center gap-1.5">
-            <NavLink
-              to="/dashboard"
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                  isActive
-                    ? 'bg-slate-200 text-slate-900'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
-                }`
-              }
-            >
-              <LayoutDashboard className="w-4 h-4 text-slate-700" />
-              <span>Dashboard</span>
-            </NavLink>
+            {isReviewer ? (
+              <>
+                <NavLink
+                  to="/items"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      isActive
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
+                    }`
+                  }
+                >
+                  <Boxes className="w-4 h-4 text-slate-700" />
+                  <span>Cari / Daftar Barang</span>
+                </NavLink>
 
-            <NavLink
-              to="/items"
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                  isActive
-                    ? 'bg-slate-200 text-slate-900'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
-                }`
-              }
-            >
-              <Boxes className="w-4 h-4 text-slate-700" />
-              <span>Manajemen Barang</span>
-            </NavLink>
+                <NavLink
+                  to="/scanner"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      isActive
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
+                    }`
+                  }
+                >
+                  <QrCode className="w-4 h-4 text-slate-700" />
+                  <span>Scan QR Barang</span>
+                </NavLink>
+              </>
+            ) : (
+              <>
+                <NavLink
+                  to="/dashboard"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      isActive
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
+                    }`
+                  }
+                >
+                  <LayoutDashboard className="w-4 h-4 text-slate-700" />
+                  <span>Dashboard</span>
+                </NavLink>
 
-            <NavLink
-              to="/transactions"
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                  isActive
-                    ? 'bg-slate-200 text-slate-900'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
-                }`
-              }
-            >
-              <ArrowLeftRight className="w-4 h-4 text-slate-700" />
-              <span>Riwayat Mutasi</span>
-            </NavLink>
+                <NavLink
+                  to="/items"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      isActive
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
+                    }`
+                  }
+                >
+                  <Boxes className="w-4 h-4 text-slate-700" />
+                  <span>Manajemen Barang</span>
+                </NavLink>
 
-            <NavLink
-              to="/stock-take"
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                  isActive
-                    ? 'bg-slate-200 text-slate-900'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
-                }`
-              }
-            >
-              <ClipboardCheck className="w-4 h-4 text-slate-700" />
-              <span>Stock Opname</span>
-            </NavLink>
+                <NavLink
+                  to="/transactions"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      isActive
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
+                    }`
+                  }
+                >
+                  <ArrowLeftRight className="w-4 h-4 text-slate-700" />
+                  <span>Riwayat Mutasi</span>
+                </NavLink>
+
+                <NavLink
+                  to="/stock-take"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      isActive
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
+                    }`
+                  }
+                >
+                  <ClipboardCheck className="w-4 h-4 text-slate-700" />
+                  <span>Stock Opname</span>
+                </NavLink>
+              </>
+            )}
           </nav>
 
           {/* Right Controls: Scan QR (hidden on mobile since MobileNav has it), Supervisor Profile Pill, Logout */}

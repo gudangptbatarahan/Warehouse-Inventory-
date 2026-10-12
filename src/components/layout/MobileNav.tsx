@@ -1,15 +1,23 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Boxes, QrCode, ArrowLeftRight, ClipboardCheck } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export const MobileNav: React.FC = () => {
-  const items = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/items', label: 'Barang', icon: Boxes },
-    { to: '/scanner', label: 'Scan QR', icon: QrCode, highlight: true },
-    { to: '/transactions', label: 'Mutasi', icon: ArrowLeftRight },
-    { to: '/stock-take', label: 'STO', icon: ClipboardCheck },
-  ];
+  const { isReviewer } = useAuth();
+
+  const items = isReviewer
+    ? [
+        { to: '/items', label: 'Cari Barang', icon: Boxes },
+        { to: '/scanner', label: 'Scan QR', icon: QrCode, highlight: true },
+      ]
+    : [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { to: '/items', label: 'Barang', icon: Boxes },
+        { to: '/scanner', label: 'Scan QR', icon: QrCode, highlight: true },
+        { to: '/transactions', label: 'Mutasi', icon: ArrowLeftRight },
+        { to: '/stock-take', label: 'STO', icon: ClipboardCheck },
+      ];
 
   return (
     <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 pb-safe shadow-lg">

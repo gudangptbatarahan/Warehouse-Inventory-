@@ -26,6 +26,15 @@ export const PRESEEDED_USERS: UserAccount[] = [
     pin: 'evl#bukitasam2026'
   },
   {
+    id: 'usr-reviewer',
+    username: 'Reviewer',
+    name: 'Reviewer',
+    role: 'reviewer',
+    group: 'None',
+    email: 'reviewer@ptba',
+    pin: ''
+  },
+  {
     id: 'usr-shift-a',
     username: 'Shift A',
     name: 'Shift A',
@@ -74,6 +83,7 @@ interface AuthContextType {
   isSupervisor: boolean;
   isEvaluator: boolean;
   isShiftStaff: boolean;
+  isReviewer: boolean;
   // Granular RBAC Permissions
   canManageMaster: boolean; // Add/edit master items (Supervisor only)
   canDeleteMaster: boolean; // Delete master items (Supervisor only)
@@ -149,7 +159,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!user) return false;
     
-    // Strict password check
+    // For Reviewer: no password needed at all!
+    if (user.role === 'reviewer' || user.username.toLowerCase() === 'reviewer') {
+      setCurrentUser(user);
+      return true;
+    }
+
+    // Strict password check for other roles
     const validPins = [user.pin];
     if (user.username === 'Shift C') {
       validPins.push('shift_D!PTBA');
@@ -183,11 +199,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isSupervisor = role === 'admin' || role === 'supervisor' || username === 'supervisor' || name === 'supervisor';
   const isEvaluator = role === 'evaluator' || username === 'evaluator' || name === 'evaluator';
   const isShiftStaff = role === 'staff' || username.startsWith('shift');
+  const isReviewer = role === 'reviewer' || username === 'reviewer' || name === 'reviewer';
 
   // Granular Access Rights strictly aligned with user specifications:
   // Supervisor: akses penuh
   // Evaluator: kendali penuh bagian PR Request, scan barang, search barang, export file
   // Shift A - D: mutasi barang masuk keluar, scan barang, export file mutasi, edit riwayat mutasi (in case salah tanggal/jam) tapi GABISA hapus riwayat
+  // Reviewer: hanya cari barang dan scan QR saja
   const canManageMaster = isSupervisor;
   const canDeleteMaster = isSupervisor;
   const canMutateStock = isSupervisor || isShiftStaff;
@@ -214,6 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSupervisor,
         isEvaluator,
         isShiftStaff,
+        isReviewer,
         canManageMaster,
         canDeleteMaster,
         canMutateStock,
