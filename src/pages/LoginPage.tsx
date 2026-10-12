@@ -12,18 +12,14 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
-  const { login, isAuthenticated, isReviewer, currentUser } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (isAuthenticated) {
-      if (isReviewer || currentUser?.role === 'reviewer') {
-        navigate('/items', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
+      navigate('/dashboard', { replace: true });
     }
-  }, [isAuthenticated, isReviewer, currentUser, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -38,11 +34,7 @@ export const LoginPage: React.FC = () => {
 
     const success = login(username, password);
     if (success) {
-      if (username.trim().toLowerCase() === 'reviewer') {
-        navigate('/items');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate('/dashboard');
     } else {
       setErrorMsg('Username akun atau kata sandi tidak valid.');
     }
@@ -174,7 +166,7 @@ export const LoginPage: React.FC = () => {
               </button>
             </form>
 
-            {/* Akses Instan Akun Reviewer (Khusus Cari Barang & Scan QR) */}
+            {/* Akses Instan Akun Reviewer (View Only) */}
             <div className="pt-2 border-t border-slate-100">
               <button
                 type="button"
@@ -183,7 +175,7 @@ export const LoginPage: React.FC = () => {
                   setPassword('');
                   const success = login('Reviewer', '');
                   if (success) {
-                    navigate('/items');
+                    navigate('/dashboard');
                   }
                 }}
                 className="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-center gap-2 transition cursor-pointer"

@@ -40,17 +40,9 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
 };
 
 const RootRedirect: React.FC = () => {
-  const { isAuthenticated, isReviewer } = useAuth();
+  const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <Navigate to={isReviewer ? "/items" : "/dashboard"} replace />;
-};
-
-const NonReviewerRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isReviewer } = useAuth();
-  if (isReviewer) {
-    return <Navigate to="/items" replace />;
-  }
-  return <>{children}</>;
+  return <Navigate to="/dashboard" replace />;
 };
 
 export default function App() {
@@ -62,14 +54,12 @@ export default function App() {
             {/* Public Auth Route */}
             <Route path="/login" element={<LoginPage />} />
 
-            {/* Protected Routes */}
+            {/* Protected Routes - Displays are open to all roles, permissions strictly enforced per action */}
             <Route
               path="/dashboard"
               element={
                 <ProtectedLayout>
-                  <NonReviewerRoute>
-                    <Dashboard />
-                  </NonReviewerRoute>
+                  <Dashboard />
                 </ProtectedLayout>
               }
             />
@@ -96,9 +86,7 @@ export default function App() {
               path="/transactions"
               element={
                 <ProtectedLayout>
-                  <NonReviewerRoute>
-                    <TransactionsPage />
-                  </NonReviewerRoute>
+                  <TransactionsPage />
                 </ProtectedLayout>
               }
             />
@@ -107,9 +95,7 @@ export default function App() {
               path="/stock-take"
               element={
                 <ProtectedLayout>
-                  <NonReviewerRoute>
-                    <StockTakePage />
-                  </NonReviewerRoute>
+                  <StockTakePage />
                 </ProtectedLayout>
               }
             />
@@ -127,9 +113,7 @@ export default function App() {
               path="/import"
               element={
                 <ProtectedLayout>
-                  <NonReviewerRoute>
-                    <ImportExportPage />
-                  </NonReviewerRoute>
+                  <ImportExportPage />
                 </ProtectedLayout>
               }
             />
@@ -138,9 +122,7 @@ export default function App() {
               path="/qr-labels"
               element={
                 <ProtectedLayout>
-                  <NonReviewerRoute>
-                    <BatchQrLabelsPage />
-                  </NonReviewerRoute>
+                  <BatchQrLabelsPage />
                 </ProtectedLayout>
               }
             />
